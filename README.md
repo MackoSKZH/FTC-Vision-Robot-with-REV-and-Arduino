@@ -1,4 +1,4 @@
-# FTC Color-Sorting Robot with Arduino LED Feedback
+# Color-Sorting Robot Control Hub & Arduino Nano ESP32 LED Control
 
 An FTC competition robot that uses camera vision, color detection, and AprilTags to sort objects into the correct containers — with LED-based visual feedback powered by Arduino.
 
