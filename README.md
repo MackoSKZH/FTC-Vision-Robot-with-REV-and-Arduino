@@ -47,9 +47,6 @@ It’s designed for:
 ---
 
 ## Wiring Diagram
-
-> *(Insert your image here)*
-
 ![Wiring Diagram](images/wiring.png)
 
 ---
