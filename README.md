@@ -9,13 +9,13 @@ An FTC competition robot that uses camera vision, color detection, and AprilTags
 - [Overview](#-overview)
 - [Hardware Components](#️-hardware-components)
 - [Wiring Diagram](#-wiring-diagram)
-- [Software & Technologies](#-software--technologies)
-- [Features & Workflow](#-features--workflow)
+- [Software & Technologies](#-software-technologies)
+- [Features & Workflow](#-features-workflow)
 - [Gamepad Controls](#-gamepad-controls)
 - [Code Structure](#️-code-structure)
-- [Installation & Setup](#-installation--setup)
+- [Installation & Setup](#-installation-setup)
 - [Future Enhancements](#️-future-enhancements)
-- [Credits & License](#-credits--license)
+- [Credits & License](#-credits-license)
 
 ---
 
