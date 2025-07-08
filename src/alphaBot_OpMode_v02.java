@@ -33,6 +33,7 @@ import com.qualcomm.robotcore.hardware.DigitalChannel;
 @TeleOp(name = "Program")
 public class alphaBot_OpMode_v02 extends LinearOpMode {
 
+    // Hardware declarations
     private DcMotor LiftL;
     private DcMotor R;
     private DcMotor L;
@@ -41,18 +42,20 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
 
     private DigitalChannel led;
 
+    // Servo positions for open/closed states
     private static final double CATCH_OPEN_L = 0.3;
     private static final double CATCH_CLOSED_L = 0.7;
-
     private static final double CATCH_OPEN_R = 0.7;
     private static final double CATCH_CLOSED_R = 0.3;
 
+    // Vision system components
     private PredominantColorProcessor.Builder myPredominantColorProcessorBuilder;
     private VisionPortal.Builder myVisionPortalBuilder;
     private PredominantColorProcessor myPredominantColorProcessor;
     private VisionPortal myVisionPortal;
     private PredominantColorProcessor.Result myResult;
 
+    // Containers that classify which colors belong to which AprilTag
     private EnumSet<PredominantColorProcessor.Swatch> container1;
     private EnumSet<PredominantColorProcessor.Swatch> container2;
     private EnumSet<PredominantColorProcessor.Swatch> container3;
@@ -72,27 +75,28 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
     private boolean ledState = false;
     private long ledTimer = 0;
 
+    // Color history to determine the most frequent color seen
     private static final int COLOR_HISTORY_SIZE = 5;
     private PredominantColorProcessor.Swatch[] colorHistory = new PredominantColorProcessor.Swatch[COLOR_HISTORY_SIZE];
     private int colorHistoryIndex = 0;
 
     @Override
     public void runOpMode() {
+        // Map hardware components
         LiftL = hardwareMap.get(DcMotor.class, "Lift L");
-
         R = hardwareMap.get(DcMotor.class, "R");
         L = hardwareMap.get(DcMotor.class, "L");
-
         CatchL = hardwareMap.get(Servo.class, "CatchL");
         CatchR = hardwareMap.get(Servo.class, "CatchR");
-
         led = hardwareMap.get(DigitalChannel.class, "controlLed");
         led.setMode(DigitalChannel.Mode.OUTPUT);
         turnOffLed();
 
+        // Set motor directions
         LiftL.setDirection(DcMotor.Direction.REVERSE);
         R.setDirection(DcMotorSimple.Direction.REVERSE);
 
+        // Initialize color processor and define ROI (Region of Interest)
         myPredominantColorProcessorBuilder = new PredominantColorProcessor.Builder();
         myPredominantColorProcessorBuilder.setRoi(ImageRegion.asUnityCenterCoordinates(-0.2, -0.8, 0.2, -1.0));
         myPredominantColorProcessorBuilder.setSwatches(
@@ -108,8 +112,10 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
                 PredominantColorProcessor.Swatch.BLACK
         );
 
+        // Initialize AprilTag processor
         myAprilTagProcessor = AprilTagProcessor.easyCreateWithDefaults();
 
+        // Build the vision portal using both processors
         myPredominantColorProcessor = myPredominantColorProcessorBuilder.build();
         myVisionPortalBuilder = new VisionPortal.Builder();
         myVisionPortalBuilder.addProcessor(myPredominantColorProcessor);
@@ -118,11 +124,14 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
         myVisionPortalBuilder.setCamera(hardwareMap.get(WebcamName.class, "webcam"));
         myVisionPortal = myVisionPortalBuilder.build();
 
+        // Set telemetry refresh rate
         telemetry.setMsTransmissionInterval(50);
 
+        // Initialize state
         colorHold = null;
         score = 0;
 
+        // Define which colors are accepted by which container
         container1 = EnumSet.of(
                 PredominantColorProcessor.Swatch.ORANGE,
                 PredominantColorProcessor.Swatch.YELLOW
@@ -139,17 +148,22 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
                 PredominantColorProcessor.Swatch.RED
         );
 
+        // Setup LED state and timer
         lastToggleTime = System.currentTimeMillis();
         ledState = false;
         led.setState(false);
 
+        // wait for driver to press START
         waitForStart();
 
+        // Main loop
         if (opModeIsActive()) {
             while (opModeIsActive()) {
+                // Get latest vision results
                 myResult = myPredominantColorProcessor.getAnalysis();
                 currentDetections = myAprilTagProcessor.getDetections();
 
+                // Proces AprilTag detections
                 if (!currentDetections.isEmpty()) {
                     lastDetection = currentDetections.get(0);
 
@@ -161,31 +175,36 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
                     }
                 }
 
-                controlRobot();
-                displayTelemetry();
+                controlRobot();       // Handle controls and actions
+                displayTelemetry();  // Update telemetry display
                 telemetry.update();
 
+                // Automatically turn off LED after 2 seconds
                 if (ledState && (System.currentTimeMillis() - ledTimer >= 2000)) {
-                    led.setState(false);  // OFF
+                    led.setState(false);
                     ledState = false;
                 }
 
+                // Save latest color to history buffer
                 if (myResult != null && myResult.closestSwatch != null) {
                     colorHistory[colorHistoryIndex] = myResult.closestSwatch;
                     colorHistoryIndex = (colorHistoryIndex + 1) % COLOR_HISTORY_SIZE;
                 }
 
-                sleep(20);
+                sleep(20); // Small delay to avoid CPU overload
             }
         }
     }
 
+    // Handles driving, lift and claw controls
     private void controlRobot() {
         double speedKoeficient = 0.3;
 
+        // Drive motors controlled by joysticks
         L.setPower(gamepad1.left_stick_y * speedKoeficient);
         R.setPower(gamepad1.right_stick_y * speedKoeficient);
 
+        // Lift motor control via D-pad
         if (gamepad1.dpad_down) {
             LiftL.setPower(0.3);
         } else if (gamepad1.dpad_up) {
@@ -194,22 +213,30 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
             LiftL.setPower(0);
         }
 
+        // Gripper control using right trigger
         if (gamepad1.right_trigger == 1) {
+            // Close grippers
             CatchL.setPosition(CATCH_CLOSED_L);
             CatchR.setPosition(CATCH_CLOSED_R);
+            
+            // Lock current color if not already stored
             if (colorHold == null) {
                 colorHold = getMostFrequentColor();
             }
             closeStatus = true;
         } else {
+            // Open grippers
             CatchL.setPosition(CATCH_OPEN_L);
             CatchR.setPosition(CATCH_OPEN_R);
+
+            // Evaluate game logic when releasing object
             gameLogic();
             colorHold = null;
             closeStatus = false;
             lastDetection = null;
         }
 
+        // Toggle telemetry with A button
         if (gamepad1.a) {
             displayTelemetry();
         } else {
@@ -225,6 +252,7 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
         led.setState(true);
     }
 
+    // Evaluates whether the held color was place into the correct container 
     private void gameLogic() {
         if (colorHold != null && lastDetection != null) {
             int id = lastDetection.id;
@@ -242,6 +270,7 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
                     break;
             }
 
+            // Update LED and message based on whether score changed
             if (lastScore == score) {
                 telemetry.addLine("Zly kontajner – bod nepridany");
                 led.setState(false);
@@ -259,6 +288,7 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
         }
     }
 
+    // Display telemetry to driver station
     private void displayTelemetry() {
         telemetry.addData("Vidim: ", myResult.closestSwatch);
         telemetry.addData("Drzana farba", colorHold != null ? colorHold.name() : "Žiadna");
@@ -279,6 +309,7 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
                 }
             }
 
+            // Provide human-readable container name 
             String meaning = "Container: ";
             if (tag.id == 1) meaning += "RED";
             else if (tag.id == 2) meaning += "GREEN";
@@ -293,6 +324,7 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
         telemetry.addData("Body", score);
     }
 
+    // Analyze history to determine most frequently seen color (excluding white/black)
     private PredominantColorProcessor.Swatch getMostFrequentColor() {
         java.util.Map<PredominantColorProcessor.Swatch, Integer> countMap = new java.util.HashMap<>();
         for (PredominantColorProcessor.Swatch swatch : colorHistory) {
@@ -313,6 +345,7 @@ public class alphaBot_OpMode_v02 extends LinearOpMode {
         return mostFrequent;
     }
 
+    // Convert raw AprilTag pose data into FTC-compatible pose object
     private AprilTagPoseFtc getPose(AprilTagDetection tag, AprilTagPoseFtc pose) {
         if (pose == null && tag.rawPose != null) {
             Orientation rot = Orientation.getOrientation(
